@@ -23,6 +23,13 @@ HOOK_post_rootfs := env("HOOK_post_rootfs", "")
 HOOK_pre_initramfs := env("HOOK_pre_initramfs", "")
 ##########################
 
+### REGISTRY AUTHENTICATION ###
+# Path to a registry auth file (e.g., /run/containers/auth.json) that will be
+# mounted into the chroot container when pulling images. This is useful for
+# pulling from private registries.
+REGISTRY_AUTH_FILE := env("REGISTRY_AUTH_FILE", "")
+###############################
+
 ### UTILS ###
 _ci_grouping := '''
 if [[ -n "${CI:-}" ]]; then
@@ -169,11 +176,16 @@ rootfs-include-container container_image=default_image image=default_image:
     {{ _ci_grouping }}
     {{ chroot_function }}
     set -euo pipefail
+    # Note: We mount auth file to /auth.json (not /run/...) because chroot_function
+    # creates a tmpfs at /run which would hide any mounts under it.
     CMD="set -xeuo pipefail
     mkdir -p /var/lib/containers/storage
+    {{ if REGISTRY_AUTH_FILE != '' { 'export REGISTRY_AUTH_FILE=/auth.json' } else { '' } }}
     podman pull {{ container_image || image }}
     dnf install -y fuse-overlayfs"
-    chroot "$CMD"
+    EXTRA_ARGS=""
+    {{ if REGISTRY_AUTH_FILE != '' { 'EXTRA_ARGS="--volume ' + REGISTRY_AUTH_FILE + ':/auth.json:ro"' } else { '' } }}
+    chroot "$CMD" $EXTRA_ARGS
 
 # Install Flatpaks into the live system
 rootfs-include-flatpaks FLATPAKS_FILE="src/flatpaks.example.txt":
