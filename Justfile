@@ -457,7 +457,7 @@ iso:
     (squash compression) \
     (iso-organize extra_kargs) \
     iso
-    mv ./output.iso {{ justfile_dir() }} &>/dev/null
+    mv ./output.iso {{ justfile_dir() }} &>/dev/null || true
 
 
 @show-config image livesys flatpaks_file compression extra_kargs container_image polkit:
