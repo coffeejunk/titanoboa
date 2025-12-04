@@ -66,6 +66,7 @@ function builder(){
     ' + PODMAN + ' run --rm -it \
     --privileged \
     --security-opt label=disable \
+    --device /dev/loop-control \
     --volume ' + git_root + ':/app \
     ' + builder_image + ' \
     /usr/bin/bash -c "$command" $args
