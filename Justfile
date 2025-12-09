@@ -174,7 +174,7 @@ rootfs-include-container container_image=default_image image=default_image podma
     mkdir -p /var/lib/containers/storage
     podman pull {{ podman_creds && '--creds=' + podman_creds }} {{ container_image || image }}
     dnf install -y fuse-overlayfs"
-    chroot "$CMD" --volume /var/lib/containers:/var/lib/containers:rslave
+    chroot "$CMD"
 
 # Install Flatpaks into the live system
 rootfs-include-flatpaks FLATPAKS_FILE="src/flatpaks.example.txt":
