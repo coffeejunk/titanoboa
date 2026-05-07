@@ -157,6 +157,14 @@ initramfs:
     {{ chroot_function }}
     set -euo pipefail
     CMD='set -xeuo pipefail
+    # Some source images ship /usr/share/rpm/rpmdb.sqlite with sqlite btree
+    # corruption, which breaks dnf transaction commits with "database disk
+    # image is malformed". rpm --rebuilddb rewrites the sqlite from the
+    # still-intact package headers when integrity_check fails.
+    if ! sqlite3 /usr/share/rpm/rpmdb.sqlite "PRAGMA integrity_check;" 2>/dev/null | grep -qx ok; then
+      echo "rpmdb integrity check failed; rebuilding from package headers"
+      rpm --rebuilddb 2>&1 || true
+    fi
     dnf install -y dracut-live
     INSTALLED_KERNEL=$(rpm -q kernel-core --queryformat "%{evr}.%{arch}" | tail -n 1)
     mkdir -p $(realpath /root)
