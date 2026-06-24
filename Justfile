@@ -1,5 +1,5 @@
 set unstable := true
-set lists
+set lists := true
 PODMAN := which("podman") || require("podman-remote")
 workdir := env("TITANOBOA_WORKDIR", "work")
 isoroot := env("TITANOBOA_ISO_ROOT", "work/iso-root")
