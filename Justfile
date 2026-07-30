@@ -111,12 +111,12 @@ function iso_dependencies(){
     elif [[ "' + arch + '" == "aarch64" ]]; then
         RPMS+=(grub2-efi-aa64-modules)
     fi
-    if ! command -v rpm >/dev/null; then
+    if ! command -v /usr/bin/rpm >/dev/null; then
         echo "1"
         return
     fi
     for rpm in "${RPMS[@]}"; do
-        if ! rpm -q $rpm >/dev/null; then
+        if ! /usr/bin/rpm -q $rpm >/dev/null; then
             MISSING+=($rpm)
         fi
     done
@@ -163,10 +163,10 @@ initramfs:
     # still-intact package headers when integrity_check fails.
     if ! sqlite3 /usr/share/rpm/rpmdb.sqlite "PRAGMA integrity_check;" 2>/dev/null | grep -qx ok; then
       echo "rpmdb integrity check failed; rebuilding from package headers"
-      rpm --rebuilddb 2>&1 || true
+      /usr/bin/rpm --rebuilddb 2>&1 || true
     fi
-    dnf install -y dracut-live
-    INSTALLED_KERNEL=$(rpm -q kernel-core --queryformat "%{evr}.%{arch}" | tail -n 1)
+    /usr/bin/dnf install -y dracut-live
+    INSTALLED_KERNEL=$(/usr/bin/rpm -q kernel-core --queryformat "%{evr}.%{arch}" | tail -n 1)
     mkdir -p $(realpath /root)
     export DRACUT_NO_XATTR=1
     dracut --zstd --reproducible --no-hostonly --kver "$INSTALLED_KERNEL" --add "dmsquash-live dmsquash-live-autooverlay" --force /app/{{ workdir }}/initramfs.img |& grep -v -e "Operation not supported"'
@@ -181,7 +181,7 @@ rootfs-include-container container_image=default_image image=default_image podma
     CMD="set -xeuo pipefail
     mkdir -p /var/lib/containers/storage
     podman pull {{ podman_creds && '--creds=' + podman_creds }} {{ container_image || image }}
-    dnf install -y fuse-overlayfs"
+    /usr/bin/dnf install -y fuse-overlayfs"
     chroot "$CMD"
 
 # Install Flatpaks into the live system
@@ -192,7 +192,7 @@ rootfs-include-flatpaks FLATPAKS_FILE="src/flatpaks.example.txt":
     {{ chroot_function }}
     CMD='set -xeuo pipefail
     mkdir -p /var/lib/flatpak
-    dnf install -y flatpak
+    /usr/bin/dnf install -y flatpak
 
     # Get Flatpaks
     flatpak remote-add --if-not-exists flathub "https://dl.flathub.org/repo/flathub.flatpakrepo"
@@ -216,8 +216,7 @@ rootfs-install-livesys-scripts livesys="1":
     {{ chroot_function }}
     set -euo pipefail
     CMD='set -xeuo pipefail
-    dnf="$({ which dnf5 || which dnf; } 2>/dev/null)"
-    $dnf install -y livesys-scripts
+    /usr/bin/dnf install -y livesys-scripts
 
     # Determine desktop environment. Must match one of /usr/libexec/livesys/sessions.d/livesys-{desktop_env}
     desktop_env=""
@@ -274,8 +273,8 @@ rootfs-clean-sysroot:
     CMD='set -xeuo pipefail
     if [[ -d /app ]]; then
         rm -rf /sysroot /ostree
-        dnf autoremove -y
-        dnf clean all -y
+        /usr/bin/dnf autoremove -y
+        /usr/bin/dnf clean all -y
     fi'
     chroot "$CMD"
 
@@ -309,7 +308,7 @@ squash fs_type="squashfs":
     if ! (( BUILDER )); then
         bash -c "$CMD" "$(realpath {{ rootfs }})" "$(realpath {{ workdir }})"
     else
-        CMD="dnf install -y {{ if fs_type == 'squashfs' { 'squashfs-tools' } else if fs_type == 'erofs' { 'erofs-utils' } else { '' } }} ; $CMD"
+        CMD="/usr/bin/dnf install -y {{ if fs_type == 'squashfs' { 'squashfs-tools' } else if fs_type == 'erofs' { 'erofs-utils' } else { '' } }} ; $CMD"
         builder "$CMD" "/app/{{ rootfs }}" "/app/{{ workdir }}"
     fi
 
@@ -361,9 +360,9 @@ iso:
     # ARCH_SHORT needs to be uppercase
     ARCH_SHORT="$(echo {{ arch }} | sed 's/x86_64/x64/g' | sed 's/aarch64/aa64/g')"
     ARCH_32="$(echo {{ arch }} | sed 's/x86_64/ia32/g' | sed 's/aarch64/arm/g')"
-    if [[ "$(rpm -E %centos)" -ge 10 ]]; then
+    if [[ "$(/usr/bin/rpm -E %centos)" -ge 10 ]]; then
         cp -avf /boot/efi/EFI/centos/. $ISOROOT/EFI/BOOT
-    elif [[ "$(rpm -E %fedora)" -ge 41 ]]; then
+    elif [[ "$(/usr/bin/rpm -E %fedora)" -ge 41 ]]; then
         cp -avf /boot/efi/EFI/fedora/. $ISOROOT/EFI/BOOT
     fi
     cp -avf $ISOROOT/boot/grub/grub.cfg $ISOROOT/EFI/BOOT/BOOT.conf
@@ -428,7 +427,7 @@ iso:
     else
         {{ if `systemd-detect-virt -c || true` != 'none' { "echo '" + style('error') + "ERROR[iso]" + NORMAL + ": Cannot run in nested containers'; exit 1" } else { '' } }}
         {{ builder_function }}
-        CMD="dnf install -y grub2 grub2-efi grub2-tools grub2-tools-extra xorriso shim dosfstools {{ if arch == "x86_64" { 'grub2-efi-x64-modules grub2-efi-x64-cdboot grub2-efi-x64' } else if arch == "aarch64" { 'grub2-efi-aa64-modules' } else { '' } }}; $CMD"
+        CMD="/usr/bin/dnf install -y grub2 grub2-efi grub2-tools grub2-tools-extra xorriso shim dosfstools {{ if arch == "x86_64" { 'grub2-efi-x64-modules grub2-efi-x64-cdboot grub2-efi-x64' } else if arch == "aarch64" { 'grub2-efi-aa64-modules' } else { '' } }}; $CMD"
         builder "$CMD" "/app/{{ isoroot }}" "/app/{{ workdir }}"
     fi
 
