@@ -109,7 +109,12 @@ function iso_dependencies(){
             grub2-efi-x64-modules
         )
     elif [[ "' + arch + '" == "aarch64" ]]; then
-        RPMS+=(grub2-efi-aa64-modules)
+        RPMS+=(
+            grub2-efi-aa64
+            grub2-efi-aa64-modules
+            shim-aa64
+            mtools
+        )
     fi
     if ! command -v /usr/bin/rpm >/dev/null; then
         echo "1"
@@ -375,7 +380,9 @@ iso:
     ARCH_OUT="$(echo {{ arch }} | sed 's/x86_64/i386-pc-eltorito/g' | sed 's/aarch64/arm64-efi/g')"
     ARCH_MODULES="$(echo {{ arch }} | sed 's/x86_64/biosdisk/g' | sed 's/aarch64/efi_gop/g')"
 
-    grub2-mkimage -O $ARCH_OUT -d /usr/lib/grub/$ARCH_GRUB -o $ISOROOT/boot/eltorito.img -p /boot/grub iso9660 $ARCH_MODULES
+    if [ "{{ arch }}" == "x86_64" ]; then
+        grub2-mkimage -O $ARCH_OUT -d /usr/lib/grub/$ARCH_GRUB -o $ISOROOT/boot/eltorito.img -p /boot/grub iso9660 $ARCH_MODULES
+    fi
     grub2-mkrescue -o $ISOROOT/../efiboot.img
 
     EFI_BOOT_MOUNT=$(mktemp -d)
@@ -394,8 +401,10 @@ iso:
     umount $EFI_BOOT_PART
 
     ARCH_SPECIFIC=()
+    BIOS_BOOT=()
     if [ "{{ arch }}" == "x86_64" ] ; then
         ARCH_SPECIFIC=("--grub2-mbr" "/usr/lib/grub/i386-pc/boot_hybrid.img")
+        BIOS_BOOT=(-b boot/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info -eltorito-alt-boot)
     fi
 
     xorrisofs \
@@ -407,12 +416,7 @@ iso:
         $ISOROOT/../efiboot.img \
         -iso_mbr_part_type EBD0A0A2-B9E5-4433-87C0-68B6B72699C7 \
         -c boot.cat --boot-catalog-hide \
-        -b boot/eltorito.img \
-        -no-emul-boot \
-        -boot-load-size 4 \
-        -boot-info-table \
-        --grub2-boot-info \
-        -eltorito-alt-boot \
+        "${BIOS_BOOT[@]}" \
         -e \
         --interval:appended_partition_2:all:: \
         -no-emul-boot \
@@ -427,7 +431,7 @@ iso:
     else
         {{ if `systemd-detect-virt -c || true` != 'none' { "echo '" + style('error') + "ERROR[iso]" + NORMAL + ": Cannot run in nested containers'; exit 1" } else { '' } }}
         {{ builder_function }}
-        CMD="/usr/bin/dnf install -y grub2 grub2-efi grub2-tools grub2-tools-extra xorriso shim dosfstools {{ if arch == "x86_64" { 'grub2-efi-x64-modules grub2-efi-x64-cdboot grub2-efi-x64' } else if arch == "aarch64" { 'grub2-efi-aa64-modules' } else { '' } }}; $CMD"
+        CMD="/usr/bin/dnf install -y grub2 grub2-efi grub2-tools grub2-tools-extra xorriso shim dosfstools {{ if arch == "x86_64" { 'grub2-efi-x64-modules grub2-efi-x64-cdboot grub2-efi-x64' } else if arch == "aarch64" { 'grub2-efi-aa64 grub2-efi-aa64-modules shim-aa64 mtools' } else { '' } }}; $CMD"
         builder "$CMD" "/app/{{ isoroot }}" "/app/{{ workdir }}"
     fi
 
