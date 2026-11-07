@@ -291,7 +291,10 @@ rootfs-selinux-fix image=default_image:
     CMD='set -xeuo pipefail
     cd /app/{{ rootfs }}
     setfiles -F -r . /etc/selinux/targeted/contexts/files/file_contexts .
-    chcon --user=system_u --recursive .'
+    # On a build host without SELinux, files setfiles leaves unlabeled
+    # have no context to change, and chcon exits 1 on them. The live
+    # session boots with enforcing=0.
+    chcon --user=system_u --recursive . || echo "chcon: some files left unlabeled"'
     {{ PODMAN }} run --rm -it \
         --volume {{ git_root }}:/app \
         --workdir "/app" \
